@@ -1,8 +1,9 @@
 import pygame
-from pygame.locals import *
+# from pygame.locals import *
 
 import os
 import random
+import math
 
 pygame.init()  # Se inicializa pygame y el control de los FPS del juego
 fpsClock = pygame.time.Clock()
@@ -10,15 +11,19 @@ fpsClock = pygame.time.Clock()
 screen_width = 480
 screen_height = 640
 
+# Creamos la superficie sobre la que se dibujará el juego
 surface = pygame.display.set_mode((screen_width, screen_height))
+# Guardamos el directorio actual de la aplicación. Normalmente no hace falta, pero en pycharm sí
+directory = os.path.dirname(os.path.realpath(__file__))
 
-highscore_file = open('highscore', 'w+')
+highscore_file = open(os.path.join(directory, "highscore"), 'w+')
 highscore = highscore_file.read()
+if highscore == '':
+    highscore = '0'
 highscore_file.close()
 
 pygame.font.init()
 # Se crea una fuente para los textos grandes en pantalla
-directory = os.path.dirname(os.path.realpath(__file__))
 fuente = pygame.font.Font(os.path.join(directory, "BEBAS.ttf"), 48)
 # fuente = pygame.font.Font("BEBAS.ttf", 48)
 gameover_txt = fuente.render("Game Over", True, (255, 0, 0))
@@ -45,19 +50,32 @@ largo = len(contenido)
 marcianotes = []
 marcianotes_backup = []
 
+mar_max_width = 32
+mar_max_height = 32
 contador = 0
 
+
+def escalar_imagen(ancho, alto):
+    # Calculamos la proporción inicial para saber si es más alto que ancho o viceversa
+    proporcion = ancho / alto
+    # Según lo que sea más grande calculamos la proporción con respecto a su máximo
+    if proporcion >= 1:
+        proporcion = ancho / mar_max_width
+    else:
+        proporcion = alto / mar_max_height
+    # Devolvemos las medidas divididas por esa misma proporción para que en cualquier caso las dos
+    # estén por debajo de sus máximos
+    return math.floor(ancho / proporcion), math.floor(alto / proporcion)
+
+
 while contador < largo:
+    # split convierte una frase en una lista de elementos separados por los espacios
     elemento = contenido[contador].split()
 
     if elemento[0] == "nave":
         nave_img = pygame.image.load(os.path.join(directory, elemento[1]))
         nave_w, nave_h = nave_img.get_rect().size[0], nave_img.get_rect().size[1]
-        # Si la imagen fuese más grande de lo debido habría que redimensionar y
-        # almacenar de nuevo su tamaño o habría problemas al calcular límites y posiciones
-        # nave_img = pygame.transform.scale(nave_img, (int(nave_w/2), int(nave_h/2)))
-        # nave_w,nave_h = nave_img.get_rect().size[0], nave_img.get_rect().size[1]
-    
+
     elif elemento[0] == "disparo":
         disparo_img = pygame.image.load(os.path.join(directory, elemento[1]))
         disparo_file = elemento[1]
@@ -67,16 +85,17 @@ while contador < largo:
         mar1_img = pygame.image.load(os.path.join(directory, elemento[1]))
         marcianito1_file = elemento[1]
         mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
-        # mar1_img = pygame.transform.scale(mar1_img, (mar1_w/2, mar1_h/2))
-        # mar1_w,mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
+        # En este caso vamos a redimensionar para ver su uso en caso de no saber el tamaño de la imagen
+        # Primero reasignamos la imagen escalada según el máximo permitido
+        mar1_img = pygame.transform.scale(mar1_img, escalar_imagen(mar1_w, mar1_h))
+        # Y segundo, volvemos a almacenar el tamaño o habría problemas al calcular límites y posiciones
+        mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
         
     # Comentados porque ahora mismo sólo se usa un tipo de marciano
     # elif elemento[0] == "marcianito2":
         # mar2_img = pygame.image.load(elemento[1])
         # mar2_w,mar2_h = mar2_img.get_rect().size[0], mar2_img.get_rect().size[1]
-        # mar2_img = pygame.transform.scale(mar2_img, (mar2_w/2, mar2_h/2))
-        # mar2_w,mar2_h = mar2_img.get_rect().size[0], mar2_img.get_rect().size[1]
-        
+
     # elif elemento[0] == "marcianito3":
         # mar3_img = pygame.image.load(elemento[1])
         # mar3_w,mar3_h = mar3_img.get_rect().size[0], mar3_img.get_rect().size[1]
@@ -148,7 +167,7 @@ disparo_x, disparo_y = -1000, -1000
 disparo_speed = 15
 
 
-def disparar(x, y):
+def disparar(pos_x, pos_y):
     global disparo_x
     global disparo_y
     global disparo_speed
@@ -160,31 +179,33 @@ def disparar(x, y):
     
     # Si el disparo está fuera de la pantalla se coloca en la posición del jugador
     if disparo_x == -1000:
-        disparo_x = x
-        disparo_y = y
+        disparo_x = pos_x
+        disparo_y = pos_y
     
     if disparado:
+        # blit dibuja una imagen en pantalla en una posición dada
         surface.blit(disparo_img, (disparo_x, disparo_y))
         
     muerto = False
-    contador = 0
+    cuenta = 0
     # Por cada posicion de marcianos se comprueba si coincide con la del disparo,
     # si coinciden se elimina la posición, se reinicia el disparo y se suma la puntuación.
-    while contador < len(posiciones) and not muerto:
-        x_marciano, y_marciano = posiciones[contador]
+    while cuenta < len(posiciones) and not muerto:
+        x_marciano, y_marciano = posiciones[cuenta]
         if x_marciano <= disparo_x <= x_marciano + mar1_w:
             if y_marciano <= disparo_y <= y_marciano + mar1_h:
                 explosion_fx.play()
                 disparado = False
                 disparo_x, disparo_y = -1000, -1000
                 
-                del marcianotes[contador]
-                del posiciones[contador]
+                del marcianotes[cuenta]
+                del posiciones[cuenta]
                 
                 score += 1
                 score_txt = fuentecilla.render("Score: " + str(score), True, (0, 0, 255))
+                muerto = True
                 
-        contador += 1
+        cuenta += 1
     
     # Si la nodriza está activa también se comprueban las posiciones
     # Al estar más alta si ha llegado aquí es porque el disparo no ha matado ningún marciano
@@ -219,9 +240,9 @@ def guardarhighscore():
     
     if not completado:
         if score > int(highscore):
-            highscore_file = open("highscore", "w")
-            highscore_file.write(str(score))
-            highscore_file.close()
+            highscore_archivo = open(os.path.join(directory, "highscore"), "w+")
+            highscore_archivo.write(str(score))
+            highscore_archivo.close()
         completado = True
 
 
@@ -231,17 +252,17 @@ def avanzar():
     global gameover
     
     paso = 16
-    contador = 0
-    while contador < len(posiciones):
-        x_temporal, y_temporal = posiciones[contador]
+    cuenta = 0
+    while cuenta < len(posiciones):
+        x_temporal, y_temporal = posiciones[cuenta]
         y_temporal += paso
         
         # Si en algún momento una nave baja lo suficiente se acaba el juego
         if y_temporal >= screen_height-nave_h*2:
             gameover = True
         
-        posiciones[contador] = (x_temporal, y_temporal)
-        contador += 1
+        posiciones[cuenta] = (x_temporal, y_temporal)
+        cuenta += 1
     
 
 # Función para reiniciar el juego
@@ -263,11 +284,11 @@ def reiniciar():
     marcianotes = []
     posiciones = []
     
-    contador = 0
-    while contador < len(marcianotes_backup):
-        marcianotes.append(marcianotes_backup[contador])
-        posiciones.append(posiciones_backup[contador])
-        contador += 1
+    cuenta = 0
+    while cuenta < len(marcianotes_backup):
+        marcianotes.append(marcianotes_backup[cuenta])
+        posiciones.append(posiciones_backup[cuenta])
+        cuenta += 1
 
 
 score = 0
@@ -338,15 +359,19 @@ while not salir:
     if keys[pygame.K_LEFT]:
         # Se le añade movimiento a la izquierda
         nave_mov -= nave_desp
-        if nave_x <= 0:
-            nave_x = 0
+
     if keys[pygame.K_RIGHT]:
         # Se le añade movimiento a la derecha
         nave_mov += nave_desp
-        if nave_x >= screen_width - nave_w:
-            nave_x = screen_width - nave_w
+
     # Se le aplica el movimiento calculado arriba
     nave_x += nave_mov
+    # Si la nueva posición calculada estuviese fuera de los márgenes de la pantalla se limitan
+    if nave_x <= 0:
+        nave_x = 0
+    elif nave_x >= screen_width - nave_w:
+        nave_x = screen_width - nave_w
+
     nave_mov = 0
 
     if keys[pygame.K_SPACE]:
@@ -374,7 +399,6 @@ while not salir:
 
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
-            pygame.quit()
             # Se rompe el bucle infinito para poder salir del juego
             salir = True
 
