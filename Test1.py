@@ -8,8 +8,55 @@ import math
 pygame.init()  # Se inicializa pygame y el control de los FPS del juego
 fpsClock = pygame.time.Clock()
 
+# region Declaracion de variables
 screen_width = 480
 screen_height = 640
+
+# Se crean los arrays que guardarán los marcianos
+marcianotes = []
+marcianotes_backup = []
+
+mar_max_width = 32
+mar_max_height = 32
+nodriza_max_width = 48
+nodriza_max_height = 32
+nave_max_width = 32
+nave_max_height = 24
+disparo_max_width = 12
+disparo_max_height = 24
+contador = 0
+
+marcianitos_column = 8
+marcianitos_filas = 5
+contador_marcianitos = 0
+contador_filas = 0
+initial_x, initial_y = 0, 64
+current_x, current_y = initial_x, initial_y
+posiciones = []
+posiciones_backup = []
+disparado = False
+gameover = False
+
+nave_x = 0
+nave_desp = 6
+nave_mov = 0
+
+nodriza_desp = 7
+nodriza_dir = 1
+nodriza_mov = False
+
+mar1_x = 0
+# Dirección en la que se mueven los marcianos
+marcianos_dir = 1
+
+# Se sitúa el disparo fuera de imagen para controlar cuándo está en uso y cuándo no
+disparo_x, disparo_y = -1000, -1000
+disparo_speed = 15
+
+score = 0
+completado = False
+
+# endregion
 
 # Creamos la superficie sobre la que se dibujará el juego
 surface = pygame.display.set_mode((screen_width, screen_height))
@@ -32,13 +79,13 @@ youwin_txt = fuente.render("You win!", True, (0, 255, 0))
 # Se crea una fuente más pequeña para la puntuación
 fuentecilla = pygame.font.Font(os.path.join(directory, "BEBAS.ttf"), 30)
 # fuentecilla = pygame.font.Font("BEBAS.ttf", 30)
-score_txt = fuentecilla.render("Score: 0", True, (0, 0, 255))
+score_txt = fuentecilla.render("Score: 0", True, (0, 255, 100))
 
 # Carga los sonidos en variables
-disparo_fx = pygame.mixer.Sound(os.path.join(directory, "flechazo.wav"))
-explosion_fx = pygame.mixer.Sound(os.path.join(directory, "explosion_marciano.wav"))
-nodriza_fx = pygame.mixer.Sound(os.path.join(directory, "nodriza_pass.wav"))
-alarma_fx = pygame.mixer.Sound(os.path.join(directory, "ambiente.wav"))
+disparo_fx = pygame.mixer.Sound(os.path.join(directory, "shoot.wav"))
+explosion_fx = pygame.mixer.Sound(os.path.join(directory, "invaderkilled.wav"))
+nodriza_fx = pygame.mixer.Sound(os.path.join(directory, "ufo_lowpitch.wav"))
+alarma_fx = pygame.mixer.Sound(os.path.join(directory, "spaceinvaders.ogg"))
 
 # Se cargan los datos de imagen desde el archivo externo
 archivo = open(os.path.join(directory, "ejemplo.txt"))
@@ -46,26 +93,19 @@ contenido = archivo.readlines()
 archivo.close()
 largo = len(contenido)
 
-# Se crean los arrays que guardarán los marcianos
-marcianotes = []
-marcianotes_backup = []
 
-mar_max_width = 32
-mar_max_height = 32
-contador = 0
-
-
-def escalar_imagen(ancho, alto):
+def escalar_imagen(imagen, ancho, alto):
+    imagen_w, imagen_h = imagen.get_rect().size[0], imagen.get_rect().size[1]
     # Calculamos la proporción inicial para saber si es más alto que ancho o viceversa
-    proporcion = ancho / alto
+    proporcion = imagen_w / imagen_h
     # Según lo que sea más grande calculamos la proporción con respecto a su máximo
     if proporcion >= 1:
-        proporcion = ancho / mar_max_width
+        proporcion = imagen_w / ancho
     else:
-        proporcion = alto / mar_max_height
+        proporcion = imagen_h / alto
     # Devolvemos las medidas divididas por esa misma proporción para que en cualquier caso las dos
     # estén por debajo de sus máximos
-    return math.floor(ancho / proporcion), math.floor(alto / proporcion)
+    return math.floor(imagen_w / proporcion), math.floor(imagen_h / proporcion)
 
 
 while contador < largo:
@@ -75,19 +115,23 @@ while contador < largo:
     if elemento[0] == "nave":
         nave_img = pygame.image.load(os.path.join(directory, elemento[1]))
         nave_w, nave_h = nave_img.get_rect().size[0], nave_img.get_rect().size[1]
+        nave_img = pygame.transform.scale(nave_img, escalar_imagen(nave_img, nave_max_width, nave_max_height))
+        nave_w, nave_h = nave_img.get_rect().size[0], nave_img.get_rect().size[1]
 
     elif elemento[0] == "disparo":
         disparo_img = pygame.image.load(os.path.join(directory, elemento[1]))
         disparo_file = elemento[1]
         disparo_w, disparo_h = disparo_img.get_rect().size[0], disparo_img.get_rect().size[1]
-    
+        disparo_img = pygame.transform.scale(disparo_img, escalar_imagen(disparo_img, disparo_max_width, disparo_max_height))
+        disparo_w, disparo_h = disparo_img.get_rect().size[0], disparo_img.get_rect().size[1]
+
     elif elemento[0] == "marcianito1":
         mar1_img = pygame.image.load(os.path.join(directory, elemento[1]))
         marcianito1_file = elemento[1]
         mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
         # En este caso vamos a redimensionar para ver su uso en caso de no saber el tamaño de la imagen
         # Primero reasignamos la imagen escalada según el máximo permitido
-        mar1_img = pygame.transform.scale(mar1_img, escalar_imagen(mar1_w, mar1_h))
+        mar1_img = pygame.transform.scale(mar1_img, escalar_imagen(mar1_img, mar_max_width, mar_max_height))
         # Y segundo, volvemos a almacenar el tamaño o habría problemas al calcular límites y posiciones
         mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
         
@@ -103,24 +147,18 @@ while contador < largo:
     elif elemento[0] == "nodriza":
         nodriza_img = pygame.image.load(os.path.join(directory, elemento[1]))
         nodriza_w, nodriza_h = nodriza_img.get_rect().size[0], nodriza_img.get_rect().size[1]
-        
+        nodriza_img = pygame.transform.scale(nodriza_img, escalar_imagen(nodriza_img, nodriza_max_width,
+                                                                         nodriza_max_height))
+        nodriza_w, nodriza_h = nodriza_img.get_rect().size[0], nodriza_img.get_rect().size[1]
+
     elif elemento[0] == "fondo":
         fondo_img = pygame.image.load(os.path.join(directory, elemento[1]))
         
     contador = contador + 1
 # ARCHIVO CARGADO
 
-# Se inicializan las variables
-marcianitos_column = 8
-marcianitos_filas = 5
-contador_marcianitos = 0
-contador_filas = 0
-initial_x, initial_y = 0, 64
-current_x, current_y = initial_x, initial_y
-posiciones = []
-posiciones_backup = []
-disparado = False
-gameover = False
+# Situamos la nodriza tras conocer su tamaño
+nodriza_x, nodriza_y = -nodriza_w, 38
 
 # Se crea el array de marcianos
 while contador_filas < marcianitos_filas:
@@ -148,23 +186,6 @@ while contador_filas < marcianitos_filas:
     
     current_y += marciano_height + 8
     contador_filas += 1
-
-nave_x = 0
-nave_desp = 6
-nave_mov = 0
-
-nodriza_x, nodriza_y = -nodriza_w, 38
-nodriza_desp = 6
-nodriza_dir = 1
-nodriza_mov = False
-
-mar1_x = 0
-# Dirección en la que se mueven los marcianos
-marcianos_dir = 1
-
-# Se sitúa el disparo fuera de imagen para controlar cuándo está en uso y cuándo no
-disparo_x, disparo_y = -1000, -1000
-disparo_speed = 15
 
 
 def disparar(pos_x, pos_y):
@@ -202,7 +223,7 @@ def disparar(pos_x, pos_y):
                 del posiciones[cuenta]
                 
                 score += 1
-                score_txt = fuentecilla.render("Score: " + str(score), True, (0, 0, 255))
+                score_txt = fuentecilla.render("Score: " + str(score), True, (0, 255, 100))
                 muerto = True
                 
         cuenta += 1
@@ -222,7 +243,7 @@ def disparar(pos_x, pos_y):
                 nodriza_fx.stop()
                 
                 score += 5
-                score_txt = fuentecilla.render("Score: " + str(score), True, (0, 0, 255))
+                score_txt = fuentecilla.render("Score: " + str(score), True, (0, 255, 100))
 
     # Si el disparo sigue activo se modifica su posición
     disparo_y -= disparo_speed
@@ -251,14 +272,14 @@ def avanzar():
     global posiciones
     global gameover
     
-    paso = 16
+    paso = 14
     cuenta = 0
     while cuenta < len(posiciones):
         x_temporal, y_temporal = posiciones[cuenta]
         y_temporal += paso
         
         # Si en algún momento una nave baja lo suficiente se acaba el juego
-        if y_temporal >= screen_height-nave_h*2:
+        if y_temporal >= screen_height-nave_h*5:
             gameover = True
         
         posiciones[cuenta] = (x_temporal, y_temporal)
@@ -291,8 +312,6 @@ def reiniciar():
         cuenta += 1
 
 
-score = 0
-completado = False
 # -1 indica que el audio hace un loop infinito
 alarma_fx.play(-1)
 
@@ -317,7 +336,7 @@ while not salir:
         # Posibilidades de que se active la nodriza, a mayor número, menos opciones
         if random.randint(1, 1000) % 500 == 0:
             nodriza_mov = True
-            nodriza_fx.play(-1)
+            nodriza_fx.play()
 
     contador_marcianitos = 0
     max_x = 0
