@@ -1,5 +1,4 @@
 import pygame
-# from pygame.locals import *
 
 import os
 import random
@@ -9,6 +8,7 @@ pygame.init()  # Se inicializa pygame y el control de los FPS del juego
 fpsClock = pygame.time.Clock()
 
 # region Declaracion de variables
+# Tamaño de pantalla
 screen_width = 480
 screen_height = 640
 
@@ -16,6 +16,11 @@ screen_height = 640
 marcianotes = []
 marcianotes_backup = []
 
+# Se crean los arrays que guardarán las posiciones de los marcianos
+posiciones = []
+posiciones_backup = []
+
+# Tamaños máximos para las imágenes
 mar_max_width = 32
 mar_max_height = 32
 nodriza_max_width = 48
@@ -24,38 +29,40 @@ nave_max_width = 32
 nave_max_height = 24
 disparo_max_width = 12
 disparo_max_height = 24
-contador = 0
 
+contador = 0  # Contador de filas del archivo
+
+# Número de marcianos en pantalla y contador de filas de marcianos
 marcianitos_column = 8
 marcianitos_filas = 5
-contador_marcianitos = 0
 contador_filas = 0
+
+# Posicion inicial de los marcianos, que no se cambiará, y posición actual, que se actualizará cada frame
 initial_x, initial_y = 0, 64
 current_x, current_y = initial_x, initial_y
-posiciones = []
-posiciones_backup = []
-disparado = False
-gameover = False
+marcianos_dir = 1  # Dirección en la que se mueven los marcianos
 
+# Posición inicial de la nave del jugador, su velocidad de desplazamiento y movimiento actual
 nave_x = 0
 nave_desp = 6
 nave_mov = 0
 
+# Velocidad, dirección y si está activa la nave nodriza
 nodriza_desp = 7
 nodriza_dir = 1
 nodriza_mov = False
-
-mar1_x = 0
-# Dirección en la que se mueven los marcianos
-marcianos_dir = 1
 
 # Se sitúa el disparo fuera de imagen para controlar cuándo está en uso y cuándo no
 disparo_x, disparo_y = -1000, -1000
 disparo_speed = 15
 
 score = 0
-completado = False
 
+# Variables de control del juego
+
+disparado = False
+gameover = False
+completado = False
 # endregion
 
 # Creamos la superficie sobre la que se dibujará el juego
@@ -63,6 +70,7 @@ surface = pygame.display.set_mode((screen_width, screen_height))
 # Guardamos el directorio actual de la aplicación. Normalmente no hace falta, pero en pycharm sí
 directory = os.path.dirname(os.path.realpath(__file__))
 
+# Cargamos la puntuación máxima, y si no hay se pone a cero
 highscore_file = open(os.path.join(directory, "highscore"), 'w+')
 highscore = highscore_file.read()
 if highscore == '':
@@ -91,7 +99,6 @@ alarma_fx = pygame.mixer.Sound(os.path.join(directory, "spaceinvaders.ogg"))
 archivo = open(os.path.join(directory, "ejemplo.txt"))
 contenido = archivo.readlines()
 archivo.close()
-largo = len(contenido)
 
 
 def escalar_imagen(imagen, ancho, alto):
@@ -108,7 +115,7 @@ def escalar_imagen(imagen, ancho, alto):
     return math.floor(imagen_w / proporcion), math.floor(imagen_h / proporcion)
 
 
-while contador < largo:
+while contador < len(contenido):
     # split convierte una frase en una lista de elementos separados por los espacios
     elemento = contenido[contador].split()
 
@@ -122,28 +129,31 @@ while contador < largo:
         disparo_img = pygame.image.load(os.path.join(directory, elemento[1]))
         disparo_file = elemento[1]
         disparo_w, disparo_h = disparo_img.get_rect().size[0], disparo_img.get_rect().size[1]
-        disparo_img = pygame.transform.scale(disparo_img, escalar_imagen(disparo_img, disparo_max_width, disparo_max_height))
+        disparo_img = pygame.transform.scale(disparo_img, escalar_imagen(disparo_img, disparo_max_width,
+                                                                         disparo_max_height))
         disparo_w, disparo_h = disparo_img.get_rect().size[0], disparo_img.get_rect().size[1]
 
     elif elemento[0] == "marcianito1":
         mar1_img = pygame.image.load(os.path.join(directory, elemento[1]))
-        marcianito1_file = elemento[1]
         mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
         # En este caso vamos a redimensionar para ver su uso en caso de no saber el tamaño de la imagen
         # Primero reasignamos la imagen escalada según el máximo permitido
         mar1_img = pygame.transform.scale(mar1_img, escalar_imagen(mar1_img, mar_max_width, mar_max_height))
         # Y segundo, volvemos a almacenar el tamaño o habría problemas al calcular límites y posiciones
         mar1_w, mar1_h = mar1_img.get_rect().size[0], mar1_img.get_rect().size[1]
-        
-    # Comentados porque ahora mismo sólo se usa un tipo de marciano
-    # elif elemento[0] == "marcianito2":
-        # mar2_img = pygame.image.load(elemento[1])
-        # mar2_w,mar2_h = mar2_img.get_rect().size[0], mar2_img.get_rect().size[1]
 
-    # elif elemento[0] == "marcianito3":
-        # mar3_img = pygame.image.load(elemento[1])
-        # mar3_w,mar3_h = mar3_img.get_rect().size[0], mar3_img.get_rect().size[1]
-        
+    elif elemento[0] == "marcianito2":
+        mar2_img = pygame.image.load(os.path.join(directory, elemento[1]))
+        mar2_w, mar2_h = mar2_img.get_rect().size[0], mar2_img.get_rect().size[1]
+        mar2_img = pygame.transform.scale(mar2_img, escalar_imagen(mar2_img, mar_max_width, mar_max_height))
+        mar2_w, mar2_h = mar2_img.get_rect().size[0], mar2_img.get_rect().size[1]
+
+    elif elemento[0] == "marcianito3":
+        mar3_img = pygame.image.load(os.path.join(directory, elemento[1]))
+        mar3_w, mar3_h = mar3_img.get_rect().size[0], mar3_img.get_rect().size[1]
+        mar3_img = pygame.transform.scale(mar3_img, escalar_imagen(mar3_img, mar_max_width, mar_max_height))
+        mar3_w, mar3_h = mar3_img.get_rect().size[0], mar3_img.get_rect().size[1]
+
     elif elemento[0] == "nodriza":
         nodriza_img = pygame.image.load(os.path.join(directory, elemento[1]))
         nodriza_w, nodriza_h = nodriza_img.get_rect().size[0], nodriza_img.get_rect().size[1]
@@ -204,7 +214,7 @@ def disparar(pos_x, pos_y):
         disparo_y = pos_y
     
     if disparado:
-        # blit dibuja una imagen en pantalla en una posición dada
+        # blit prepara una imagen en pantalla en una posición dada
         surface.blit(disparo_img, (disparo_x, disparo_y))
         
     muerto = False
